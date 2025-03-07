@@ -1,4 +1,4 @@
-# LLMS-for-inverse-problems-in-optics
+# LLM-optics
 
 # LLM-Optics: Leveraging Language Models for Inverse Problems in Optics
 
