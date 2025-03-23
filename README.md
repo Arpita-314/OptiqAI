@@ -1,7 +1,6 @@
-# LLM-optics
+# Fourier Optics Framework
 
-# LLM-Optics: Leveraging Language Models for Inverse Problems in Optics
-
+# Trying to create a fourier optics framework to automate the data analysis for fourier optics dataset 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yourusername/llm-optics/blob/main/LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
