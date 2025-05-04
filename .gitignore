@@ -31,6 +31,24 @@ ENV/
 *.swp
 *.swo
 
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Project specific
+rustup-init.exe
+*.log
+.DS_Store
+
 # CUDA
 *.cuda
 *.cu
@@ -46,10 +64,8 @@ ENV/
 *.hdf5
 
 # Logs
-*.log
 logs/
 tensorboard/
 
 # OS specific
-.DS_Store
 Thumbs.db 

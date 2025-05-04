@@ -1,0 +1,20 @@
+[package]
+name = "fourierlab-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "fourierlab_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+ndarray = "0.15"
+num-complex = "0.4"
+rayon = "1.7"
+pyo3 = { version = "0.18", features = ["extension-module"] }
+numpy = "0.18"
+rand = "0.8"
+ndarray-fft = "0.15"
+ndarray-stats = "0.5"
+fftw = "0.13"
+special = "0.8"  # For Bessel functions 

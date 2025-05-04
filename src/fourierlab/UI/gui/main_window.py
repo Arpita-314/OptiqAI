@@ -16,6 +16,14 @@ from fourierlab.core.phase_mask import PhaseMaskGenerator
 from fourierlab.core.pattern_generator import PatternGenerator
 from fourierlab.UI.gui.automl_manager import AutoMLManager
 from fourierlab.utils.visualization import TrainingVisualizer
+from fourierlab.core.propagator_factory import PropagatorFactory
+from fourierlab.UI.gui.quantum_optics_gui import main
+from fourierlab.core.quantum_optics_calculator import QuantumOpticsCalculator
+from fourierlab.core.quantum_state_generator import QuantumStateGenerator
+from fourierlab.core.quantum_operations import QuantumOperations
+from fourierlab.core.quantum_state_analyzer import QuantumStateAnalyzer
+from fourierlab.core.quantum_state_io import QuantumStateIO
+import matplotlib.pyplot as plt
 
 class TrainingThread(QThread):
     def __init__(self, training_manager, train_loader, val_loader, epochs):
@@ -53,6 +61,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Fourier Optics AutoML for Photonics")
         self.setMinimumSize(800, 600)
         
+        # Initialize device selection
+        self.device_mode = 'auto'  # Default to auto
+        self.check_device_capabilities()
+        
         # Initialize managers
         self.data_manager = DataManager()
         self.data_manager.data_loaded.connect(self.on_data_loaded)
@@ -73,13 +85,37 @@ class MainWindow(QMainWindow):
         self.automl_manager.optimization_complete.connect(self.on_optimization_complete)
         self.automl_manager.error_occurred.connect(self.on_automl_error)
         
+        # Initialize quantum optics components
+        self.quantum_calculator = QuantumOpticsCalculator()
+        self.quantum_generator = QuantumStateGenerator(self.quantum_calculator)
+        self.quantum_operations = QuantumOperations(self.quantum_calculator)
+        self.quantum_analyzer = QuantumStateAnalyzer(self.quantum_calculator)
+        self.quantum_io = QuantumStateIO(self.quantum_calculator)
+        
         # Setup UI
         self.tabs = QTabWidget()
         self.tabs.addTab(self.data_analysis_tab(), "Data Analysis")
         self.tabs.addTab(self.inverse_design_tab(), "Inverse Design")
         self.tabs.addTab(self.automl_tab(), "AutoML")
         self.tabs.addTab(self.dataset_generation_tab(), "Dataset Generation")
+        self.tabs.addTab(self.quantum_optics_tab(), "Quantum Optics")
         self.setCentralWidget(self.tabs)
+        
+    def check_device_capabilities(self):
+        """Check device capabilities and set appropriate mode."""
+        try:
+            if torch.cuda.is_available():
+                self.device_mode = 'gpu'
+                self.gpu_name = torch.cuda.get_device_name(0)
+                self.gpu_memory = torch.cuda.get_device_properties(0).total_memory
+            else:
+                self.device_mode = 'cpu'
+                self.gpu_name = None
+                self.gpu_memory = None
+        except Exception:
+            self.device_mode = 'cpu'
+            self.gpu_name = None
+            self.gpu_memory = None
 
     def data_analysis_tab(self):
         tab = QWidget()
@@ -279,8 +315,35 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout()
         
+        # Device Selection Section
+        device_group = QGroupBox("1. Device Selection")
+        device_layout = QVBoxLayout()
+        
+        # Device mode selection
+        mode_layout = QHBoxLayout()
+        mode_layout.addWidget(QLabel("Device Mode:"))
+        self.device_mode_combo = QComboBox()
+        self.device_mode_combo.addItems(["Auto", "GPU", "CPU"])
+        self.device_mode_combo.setCurrentText("Auto")
+        self.device_mode_combo.currentTextChanged.connect(self.on_device_mode_changed)
+        mode_layout.addWidget(self.device_mode_combo)
+        device_layout.addLayout(mode_layout)
+        
+        # Device info
+        self.device_info = QLabel()
+        self.update_device_info()
+        device_layout.addWidget(self.device_info)
+        
+        # Feature info
+        self.feature_info = QLabel()
+        self.update_feature_info()
+        device_layout.addWidget(self.feature_info)
+        
+        device_group.setLayout(device_layout)
+        layout.addWidget(device_group)
+        
         # Target Specification Section
-        target_group = QGroupBox("1. Specify Target")
+        target_group = QGroupBox("2. Specify Target")
         target_layout = QVBoxLayout()
         
         # Target type selection
@@ -360,7 +423,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(target_group)
         
         # Generation Parameters Section
-        params_group = QGroupBox("2. Generation Parameters")
+        params_group = QGroupBox("3. Generation Parameters")
         params_layout = QVBoxLayout()
         
         # Wavelength
@@ -439,7 +502,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(params_group)
         
         # Generation Section
-        generate_group = QGroupBox("3. Generate Phase Mask")
+        generate_group = QGroupBox("4. Generate Phase Mask")
         generate_layout = QVBoxLayout()
         
         self.generate_btn = QPushButton("Generate Phase Mask")
@@ -460,7 +523,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(generate_group)
         
         # Results Section
-        results_group = QGroupBox("4. Results")
+        results_group = QGroupBox("5. Results")
         results_layout = QVBoxLayout()
         
         # Results display
@@ -770,6 +833,49 @@ class MainWindow(QMainWindow):
         height, width = tensor.shape
         bytes_per_line = width
         return QImage(tensor.data, width, height, bytes_per_line, QImage.Format_Grayscale8)
+
+    def on_device_mode_changed(self, mode):
+        """Handle device mode change."""
+        self.device_mode = mode.lower()
+        self.update_device_info()
+        self.update_feature_info()
+        
+        # Update propagator if it exists
+        if hasattr(self, 'phase_generator'):
+            self.phase_generator = PropagatorFactory.create_propagator(
+                mode=self.device_mode,
+                device=0 if self.device_mode == 'gpu' else None
+            )
+    
+    def update_device_info(self):
+        """Update device information display."""
+        if self.device_mode == 'gpu' and self.gpu_name:
+            info = f"GPU: {self.gpu_name}\n"
+            if self.gpu_memory:
+                info += f"Memory: {self.gpu_memory / 1024**3:.1f} GB"
+        else:
+            info = "Using CPU mode"
+        self.device_info.setText(info)
+    
+    def update_feature_info(self):
+        """Update feature information display."""
+        features = PropagatorFactory.get_available_features(self.device_mode)
+        settings = PropagatorFactory.get_recommended_settings(self.device_mode)
+        
+        info = "Available Features:\n"
+        info += f"• Max Field Size: {features['max_field_size']}x{features['max_field_size']}\n"
+        info += f"• Batch Processing: {'Yes' if features['batch_processing'] else 'No'}\n"
+        info += f"• Mixed Precision: {'Yes' if features['mixed_precision'] else 'No'}\n"
+        info += f"• Multi-GPU: {'Yes' if features['multi_gpu'] else 'No'}\n"
+        info += f"• Advanced Features: {'Yes' if features['advanced_features'] else 'No'}\n"
+        info += f"\nRecommended Settings:\n"
+        info += f"• Field Size: {settings['field_size']}x{settings['field_size']}\n"
+        info += f"• Batch Size: {settings['batch_size']}\n"
+        info += f"• Precision: {settings['precision']}\n"
+        info += f"• Memory Limit: {settings['memory_limit']*100}%\n"
+        info += f"• Optimization: {settings['optimization_level']}"
+        
+        self.feature_info.setText(info)
 
     def automl_tab(self):
         """Create the AutoML tab"""
@@ -1145,6 +1251,505 @@ class MainWindow(QMainWindow):
         if file_path:
             self.dataset_path_label.setText(f"Selected: {file_path}")
             self.dataset_path = file_path
+
+    def quantum_optics_tab(self):
+        """Create the Quantum Optics tab"""
+        tab = QWidget()
+        layout = QVBoxLayout()
+        
+        # State Generation Section
+        state_group = QGroupBox("1. Quantum State Generation")
+        state_layout = QVBoxLayout()
+        
+        # State type selection
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("State Type:"))
+        self.state_type = QComboBox()
+        self.state_type.addItems(["Fock", "Cat", "GKP", "NOON", "Cluster"])
+        self.state_type.currentTextChanged.connect(self.on_state_type_changed)
+        type_layout.addWidget(self.state_type)
+        state_layout.addLayout(type_layout)
+        
+        # State parameters
+        self.state_params = QWidget()
+        params_layout = QVBoxLayout()
+        
+        # n parameter (for Fock and NOON states)
+        n_layout = QHBoxLayout()
+        n_layout.addWidget(QLabel("n:"))
+        self.n_param = QSpinBox()
+        self.n_param.setRange(0, 100)
+        self.n_param.setValue(1)
+        n_layout.addWidget(self.n_param)
+        params_layout.addLayout(n_layout)
+        
+        # alpha parameter (for Cat state)
+        alpha_layout = QHBoxLayout()
+        alpha_layout.addWidget(QLabel("α:"))
+        self.alpha_param = QDoubleSpinBox()
+        self.alpha_param.setRange(0.0, 10.0)
+        self.alpha_param.setValue(1.0)
+        self.alpha_param.setSingleStep(0.1)
+        alpha_layout.addWidget(self.alpha_param)
+        params_layout.addLayout(alpha_layout)
+        
+        # delta parameter (for GKP state)
+        delta_layout = QHBoxLayout()
+        delta_layout.addWidget(QLabel("δ:"))
+        self.delta_param = QDoubleSpinBox()
+        self.delta_param.setRange(0.01, 1.0)
+        self.delta_param.setValue(0.1)
+        self.delta_param.setSingleStep(0.01)
+        delta_layout.addWidget(self.delta_param)
+        params_layout.addLayout(delta_layout)
+        
+        # num_modes parameter (for Cluster state)
+        modes_layout = QHBoxLayout()
+        modes_layout.addWidget(QLabel("Number of Modes:"))
+        self.modes_param = QSpinBox()
+        self.modes_param.setRange(2, 10)
+        self.modes_param.setValue(4)
+        modes_layout.addWidget(self.modes_param)
+        params_layout.addLayout(modes_layout)
+        
+        self.state_params.setLayout(params_layout)
+        state_layout.addWidget(self.state_params)
+        
+        # Generate button
+        self.generate_state_btn = QPushButton("Generate State")
+        self.generate_state_btn.clicked.connect(self.generate_quantum_state)
+        state_layout.addWidget(self.generate_state_btn)
+        
+        state_group.setLayout(state_layout)
+        layout.addWidget(state_group)
+        
+        # Quantum Operations Section
+        operations_group = QGroupBox("2. Quantum Operations")
+        operations_layout = QVBoxLayout()
+        
+        # Operation selection
+        op_layout = QHBoxLayout()
+        op_layout.addWidget(QLabel("Operation:"))
+        self.operation_type = QComboBox()
+        self.operation_type.addItems([
+            "Beam Splitter", "Phase Shifter", "Squeezer",
+            "Displacement", "Kerr Nonlinearity", "Two-Mode Squeezing"
+        ])
+        self.operation_type.currentTextChanged.connect(self.on_operation_changed)
+        op_layout.addWidget(self.operation_type)
+        operations_layout.addLayout(op_layout)
+        
+        # Operation parameters
+        self.operation_params = QWidget()
+        op_params_layout = QVBoxLayout()
+        
+        # theta parameter (for beam splitter)
+        theta_layout = QHBoxLayout()
+        theta_layout.addWidget(QLabel("θ:"))
+        self.theta_param = QDoubleSpinBox()
+        self.theta_param.setRange(0.0, np.pi)
+        self.theta_param.setValue(np.pi/4)
+        self.theta_param.setSingleStep(0.1)
+        theta_layout.addWidget(self.theta_param)
+        op_params_layout.addLayout(theta_layout)
+        
+        # phi parameter (for phase shifter)
+        phi_layout = QHBoxLayout()
+        phi_layout.addWidget(QLabel("φ:"))
+        self.phi_param = QDoubleSpinBox()
+        self.phi_param.setRange(0.0, 2*np.pi)
+        self.phi_param.setValue(np.pi/2)
+        self.phi_param.setSingleStep(0.1)
+        phi_layout.addWidget(self.phi_param)
+        op_params_layout.addLayout(phi_layout)
+        
+        # r parameter (for squeezer)
+        r_layout = QHBoxLayout()
+        r_layout.addWidget(QLabel("r:"))
+        self.r_param = QDoubleSpinBox()
+        self.r_param.setRange(0.0, 5.0)
+        self.r_param.setValue(0.5)
+        self.r_param.setSingleStep(0.1)
+        r_layout.addWidget(self.r_param)
+        op_params_layout.addLayout(r_layout)
+        
+        # alpha parameter (for displacement)
+        disp_alpha_layout = QHBoxLayout()
+        disp_alpha_layout.addWidget(QLabel("α:"))
+        self.disp_alpha_real = QDoubleSpinBox()
+        self.disp_alpha_real.setRange(-5.0, 5.0)
+        self.disp_alpha_real.setValue(1.0)
+        self.disp_alpha_real.setSingleStep(0.1)
+        disp_alpha_layout.addWidget(self.disp_alpha_real)
+        disp_alpha_layout.addWidget(QLabel("+"))
+        self.disp_alpha_imag = QDoubleSpinBox()
+        self.disp_alpha_imag.setRange(-5.0, 5.0)
+        self.disp_alpha_imag.setValue(1.0)
+        self.disp_alpha_imag.setSingleStep(0.1)
+        disp_alpha_layout.addWidget(self.disp_alpha_imag)
+        disp_alpha_layout.addWidget(QLabel("i"))
+        op_params_layout.addLayout(disp_alpha_layout)
+        
+        # chi parameter (for Kerr nonlinearity)
+        chi_layout = QHBoxLayout()
+        chi_layout.addWidget(QLabel("χ:"))
+        self.chi_param = QDoubleSpinBox()
+        self.chi_param.setRange(0.0, 1.0)
+        self.chi_param.setValue(0.1)
+        self.chi_param.setSingleStep(0.01)
+        chi_layout.addWidget(self.chi_param)
+        op_params_layout.addLayout(chi_layout)
+        
+        self.operation_params.setLayout(op_params_layout)
+        operations_layout.addWidget(self.operation_params)
+        
+        # Apply button
+        self.apply_operation_btn = QPushButton("Apply Operation")
+        self.apply_operation_btn.clicked.connect(self.apply_quantum_operation)
+        operations_layout.addWidget(self.apply_operation_btn)
+        
+        operations_group.setLayout(operations_layout)
+        layout.addWidget(operations_group)
+        
+        # Analysis Section
+        analysis_group = QGroupBox("3. State Analysis")
+        analysis_layout = QVBoxLayout()
+        
+        # Analysis controls
+        controls_layout = QHBoxLayout()
+        
+        self.analyze_btn = QPushButton("Analyze State")
+        self.analyze_btn.clicked.connect(self.analyze_quantum_state)
+        controls_layout.addWidget(self.analyze_btn)
+        
+        self.tomography_btn = QPushButton("Perform Tomography")
+        self.tomography_btn.clicked.connect(self.perform_tomography)
+        controls_layout.addWidget(self.tomography_btn)
+        
+        analysis_layout.addLayout(controls_layout)
+        
+        # Results display
+        self.results_display = QTextEdit()
+        self.results_display.setReadOnly(True)
+        analysis_layout.addWidget(self.results_display)
+        
+        analysis_group.setLayout(analysis_layout)
+        layout.addWidget(analysis_group)
+        
+        # Visualization Section
+        viz_group = QGroupBox("4. Visualization")
+        viz_layout = QVBoxLayout()
+        
+        # Visualization controls
+        viz_controls = QHBoxLayout()
+        
+        self.plot_wigner_btn = QPushButton("Plot Wigner Function")
+        self.plot_wigner_btn.clicked.connect(self.plot_wigner_function)
+        viz_controls.addWidget(self.plot_wigner_btn)
+        
+        self.plot_phase_btn = QPushButton("Plot Phase Space")
+        self.plot_phase_btn.clicked.connect(self.plot_phase_space)
+        viz_controls.addWidget(self.plot_phase_btn)
+        
+        viz_layout.addLayout(viz_controls)
+        
+        # Save controls
+        save_layout = QHBoxLayout()
+        
+        self.save_state_btn = QPushButton("Save State")
+        self.save_state_btn.clicked.connect(self.save_quantum_state)
+        save_layout.addWidget(self.save_state_btn)
+        
+        self.save_results_btn = QPushButton("Save Results")
+        self.save_results_btn.clicked.connect(self.save_analysis_results)
+        save_layout.addWidget(self.save_results_btn)
+        
+        viz_layout.addLayout(save_layout)
+        
+        viz_group.setLayout(viz_layout)
+        layout.addWidget(viz_group)
+        
+        tab.setLayout(layout)
+        return tab
+
+    def on_state_type_changed(self, state_type):
+        """Handle state type selection change"""
+        # Show/hide relevant parameters based on state type
+        self.n_param.setVisible(state_type in ["Fock", "NOON"])
+        self.alpha_param.setVisible(state_type == "Cat")
+        self.delta_param.setVisible(state_type == "GKP")
+        self.modes_param.setVisible(state_type == "Cluster")
+
+    def generate_quantum_state(self):
+        """Handle quantum state generation"""
+        try:
+            state_type = self.state_type.currentText()
+            size = (256, 256)  # Default size
+            
+            if state_type == "Fock":
+                state = self.quantum_generator.create_fock_state(
+                    n=self.n_param.value(),
+                    size=size
+                )
+            elif state_type == "Cat":
+                state = self.quantum_generator.create_cat_state(
+                    alpha=self.alpha_param.value(),
+                    size=size
+                )
+            elif state_type == "GKP":
+                state = self.quantum_generator.create_gkp_state(
+                    delta=self.delta_param.value(),
+                    size=size
+                )
+            elif state_type == "NOON":
+                state = self.quantum_generator.create_noon_state(
+                    n=self.n_param.value(),
+                    size=size
+                )
+            elif state_type == "Cluster":
+                state = self.quantum_generator.create_cluster_state(
+                    size=size,
+                    num_modes=self.modes_param.value()
+                )
+            
+            # Store the generated state
+            self.current_state = state
+            
+            # Update UI
+            self.results_display.setText(f"Generated {state_type} state successfully!")
+            self.analyze_btn.setEnabled(True)
+            self.tomography_btn.setEnabled(True)
+            self.plot_wigner_btn.setEnabled(True)
+            self.plot_phase_btn.setEnabled(True)
+            self.save_state_btn.setEnabled(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate state: {str(e)}")
+
+    def on_operation_changed(self, operation_type):
+        """Handle operation selection change"""
+        # Show/hide relevant parameters based on operation type
+        self.theta_param.setVisible(operation_type == "Beam Splitter")
+        self.phi_param.setVisible(operation_type == "Phase Shifter")
+        self.r_param.setVisible(operation_type in ["Squeezer", "Two-Mode Squeezing"])
+        self.disp_alpha_real.setVisible(operation_type == "Displacement")
+        self.disp_alpha_imag.setVisible(operation_type == "Displacement")
+        self.chi_param.setVisible(operation_type == "Kerr Nonlinearity")
+
+    def apply_quantum_operation(self):
+        """Handle quantum operation application"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            operation_type = self.operation_type.currentText()
+            state = self.current_state.state
+            
+            if operation_type == "Beam Splitter":
+                # Create a second state for beam splitter operation
+                second_state = self.quantum_generator.create_fock_state(n=0, size=state.shape)
+                out1, out2 = self.quantum_operations.beam_splitter(
+                    state,
+                    second_state.state,
+                    theta=self.theta_param.value()
+                )
+                self.current_state.state = out1
+                self.second_state = out2
+                
+            elif operation_type == "Phase Shifter":
+                self.current_state.state = self.quantum_operations.phase_shifter(
+                    state,
+                    phi=self.phi_param.value()
+                )
+                
+            elif operation_type == "Squeezer":
+                self.current_state.state = self.quantum_operations.squeezer(
+                    state,
+                    r=self.r_param.value()
+                )
+                
+            elif operation_type == "Displacement":
+                alpha = self.disp_alpha_real.value() + 1j * self.disp_alpha_imag.value()
+                self.current_state.state = self.quantum_operations.displacement(
+                    state,
+                    alpha=alpha
+                )
+                
+            elif operation_type == "Kerr Nonlinearity":
+                self.current_state.state = self.quantum_operations.kerr_nonlinearity(
+                    state,
+                    chi=self.chi_param.value()
+                )
+                
+            elif operation_type == "Two-Mode Squeezing":
+                # Create a second state for two-mode squeezing
+                second_state = self.quantum_generator.create_fock_state(n=0, size=state.shape)
+                out1, out2 = self.quantum_operations.two_mode_squeezing(
+                    state,
+                    second_state.state,
+                    r=self.r_param.value()
+                )
+                self.current_state.state = out1
+                self.second_state = out2
+            
+            # Update UI
+            self.results_display.setText(f"Applied {operation_type} operation successfully!")
+            self.analyze_btn.setEnabled(True)
+            self.tomography_btn.setEnabled(True)
+            self.plot_wigner_btn.setEnabled(True)
+            self.plot_phase_btn.setEnabled(True)
+            self.save_state_btn.setEnabled(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to apply operation: {str(e)}")
+
+    def analyze_quantum_state(self):
+        """Handle quantum state analysis"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Perform analysis
+            metrics = self.quantum_analyzer.analyze_state(self.current_state)
+            
+            # Display results
+            results_text = "State Analysis Results:\n\n"
+            results_text += f"Photon Number: {metrics['photon_number']:.4f}\n"
+            results_text += f"Squeezing Parameter: {metrics['squeezing']:.4f}\n"
+            results_text += f"Entanglement Measure: {metrics['entanglement']:.4f}\n"
+            results_text += f"Quantum Fisher Information: {metrics['fisher_info']:.4f}\n"
+            results_text += f"Metrological Gain: {metrics['metrological_gain']:.4f}\n"
+            
+            self.results_display.setText(results_text)
+            self.save_results_btn.setEnabled(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to analyze state: {str(e)}")
+
+    def perform_tomography(self):
+        """Handle quantum state tomography"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Perform tomography
+            tomography_results = self.quantum_analyzer.tomography.perform_tomography(
+                self.current_state.state,
+                num_measurements=1000
+            )
+            
+            # Display results
+            results_text = "Tomography Results:\n\n"
+            results_text += f"Fidelity: {tomography_results['fidelity']:.4f}\n"
+            results_text += f"Number of Measurements: 1000\n"
+            
+            self.results_display.setText(results_text)
+            self.save_results_btn.setEnabled(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to perform tomography: {str(e)}")
+
+    def plot_wigner_function(self):
+        """Plot Wigner function of the current state"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Calculate Wigner function
+            wigner = self.current_state.calculate_wigner()
+            
+            # Create visualization
+            x = torch.linspace(-5, 5, wigner.shape[0])
+            p = torch.linspace(-5, 5, wigner.shape[1])
+            
+            # Plot using matplotlib
+            plt.figure(figsize=(10, 8))
+            plt.pcolormesh(x, p, wigner, cmap='viridis')
+            plt.colorbar(label='W(x,p)')
+            plt.xlabel('Position (x)')
+            plt.ylabel('Momentum (p)')
+            plt.title('Wigner Function')
+            plt.show()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to plot Wigner function: {str(e)}")
+
+    def plot_phase_space(self):
+        """Plot phase space distribution of the current state"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Calculate phase space distribution
+            x_grid, p_grid, distribution = self.current_state.calculate_phase_space()
+            
+            # Plot using matplotlib
+            plt.figure(figsize=(10, 8))
+            plt.pcolormesh(x_grid, p_grid, distribution, cmap='viridis')
+            plt.colorbar(label='P(x,p)')
+            plt.xlabel('Position (x)')
+            plt.ylabel('Momentum (p)')
+            plt.title('Phase Space Distribution')
+            plt.show()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to plot phase space: {str(e)}")
+
+    def save_quantum_state(self):
+        """Handle quantum state saving"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Get save file path
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Quantum State",
+                "",
+                "Numpy Files (*.npy);;All Files (*.*)"
+            )
+            
+            if file_path:
+                # Save state
+                self.quantum_io.export_state(
+                    self.current_state.state,
+                    file_path,
+                    format='numpy'
+                )
+                QMessageBox.information(self, "Success", "State saved successfully!")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save state: {str(e)}")
+
+    def save_analysis_results(self):
+        """Handle quantum state analysis results saving"""
+        try:
+            if not hasattr(self, 'current_state'):
+                QMessageBox.warning(self, "Warning", "Please generate a state first!")
+                return
+            
+            # Get save file path
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Analysis Results",
+                "",
+                "Text Files (*.txt);;All Files (*.*)"
+            )
+            
+            if file_path:
+                # Save results
+                with open(file_path, 'w') as f:
+                    f.write(self.results_display.toPlainText())
+                QMessageBox.information(self, "Success", "Results saved successfully!")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save results: {str(e)}")
 
 if __name__ == "__main__":
     app = QApplication([])

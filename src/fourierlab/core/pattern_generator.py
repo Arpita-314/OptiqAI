@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from typing import Tuple, Optional, Dict, Any
+from typing import Union, Tuple, Optional, Dict, Any
 from ..physics.propagator import WavePropagator
 
 class PatternGenerator:
@@ -13,7 +13,7 @@ class PatternGenerator:
     def generate_pattern(
         self,
         pattern_type: str,
-        size: int,
+        size: Union[int, Tuple[int, int]],
         width: int = 25,
         frequency: float = 10.0,
         wavelength: float = 632.8e-9,
@@ -25,7 +25,7 @@ class PatternGenerator:
         
         Args:
             pattern_type: Type of pattern to generate
-            size: Size of pattern (size x size)
+            size: Size of pattern (single int or tuple of ints)
             width: Width of pattern features
             frequency: Frequency of pattern (for periodic patterns)
             wavelength: Wavelength of light
@@ -35,10 +35,18 @@ class PatternGenerator:
         Returns:
             Generated pattern
         """
-        # Create coordinate grid
-        x = np.linspace(-size//2, size//2-1, size)
-        y = np.linspace(-size//2, size//2-1, size)
+        # Handle size input
+        if isinstance(size, tuple):
+            height, width = size
+        else:
+            height = width = size
+        
+        # Create coordinate grids
+        x = np.linspace(-width//2, width//2-1, width)
+        y = np.linspace(-height//2, height//2-1, height)
         X, Y = np.meshgrid(x, y)
+        R = np.sqrt(X**2 + Y**2)
+        Theta = np.arctan2(Y, X)
         
         # Generate pattern
         if pattern_type == "cross":
