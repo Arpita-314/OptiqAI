@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Fourier Optics AutoML Framework is a comprehensive, automated system for analyzing and processing optical data using both Fourier optics principles and machine learning techniques. This framework is designed to bridge the gap between traditional optical analysis and modern machine learning approaches, providing a powerful tool for researchers and engineers in the field of optics.
+The Fourier Optics AutoML Framework is a comprehensive, automated system for analyzing and processing optical data using both Fourier optics principles and machine learning techniques. This framework is designed to bridge the gap between traditional optical analysis and modern machine learning approaches, providing a powerful tool for researchers and engineers in the field of optics. It is still under development.
 
 ## Features
 
@@ -72,7 +72,7 @@ The framework uses Optuna for hyperparameter optimization. Modify `training/trai
 
 ## Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to submit pull requests, report issues, or request features.
+I welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to submit pull requests, report issues, or request features.
 
 ## Citing This Work
 
