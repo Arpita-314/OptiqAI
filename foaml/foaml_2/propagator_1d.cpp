@@ -14,3 +14,4 @@ py::array_t<std::complex<double>> propagate_1d_cpp(
 PYBIND11_MODULE(propagator_1d_cpp, m) {
     m.def("propagate", &propagate_1d_cpp);
 }
+

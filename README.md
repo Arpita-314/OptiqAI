@@ -1,100 +1,77 @@
-# Fourier Optics AutoML Framework
+# FOAML: Fourier Optics AutoML Framework
 
-## Overview
-
-The Fourier Optics AutoML Framework is a comprehensive, automated system for analyzing and processing optical data using both Fourier optics principles and machine learning techniques. This framework is designed to bridge the gap between traditional optical analysis and modern machine learning approaches, providing a powerful tool for researchers and engineers in the field of optics.
+A modular, production-ready framework for training and optimizing physics-informed neural networks in Fourier optics.
 
 ## Features
 
-- **Data Ingestion**: Support for complex fields, intensity data, PSFs, and wavefront sensor measurements.
-- **Preprocessing**: Includes DC removal, windowing, FFT operations, and phase unwrapping.
-- **Model Selection**: Automated selection of physics-informed architectures (e.g., Fourier Neural Operators, U-Net variants).
-- **Training**: Automates training with physics-aware loss functions and hyperparameter optimization.
-- **Validation**: Provides Fourier optics-specific metrics like Strehl ratio, MTF correlation, RMS error, and phase RMSE.
-- **Deployment**: Exports models to TorchScript and ONNX formats for cross-platform compatibility.
-- **Visualization**: Plots intensity maps, phase maps, MTFs, and compares wavefront reconstructions.
+- Physics-informed loss functions for complex field reconstruction
+- Early stopping and Optuna-based hyperparameter optimization
+- Modular trainer class with model save/load utilities
+- Device-agnostic (CPU/GPU) training
+- Progress bars and logging for robust monitoring
 
 ## Installation
 
-### Prerequisites
-- Python 3.8+
-- CUDA-compatible GPU (optional, but recommended for large-scale simulations)
+Clone the repository and install dependencies:
+bash
+pip install -r requirements.txt
 
-### Steps
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/fourier-optics-automl.git
-   cd fourier-optics-automl
-   ```
 
-2. Create a virtual environment (optional, but recommended):
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+## Usage
 
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+python
+from trainer import OpticsTrainer
+import torch
 
-## Quick Start
+# Define your model (replace MyModel with your actual model class)
+model = MyModel()
 
-1. Run the main script:
-   ```
-   python main.py
-   ```
+# Initialize trainer
+trainer = OpticsTrainer(model, wavelength=632.8e-9, pixel_size=5e-6)
 
-2. Follow the prompts to input your data type, pixel size, and wavelength.
+# Load data (replace with your actual data)
+train_data = torch.randn(100, 1, 256, 256)
+train_targets = torch.randn(100, 2, 256, 256)
+val_data = torch.randn(20, 1, 256, 256)
+val_targets = torch.randn(20, 2, 256, 256)
 
-3. The framework will guide you through data preprocessing, model selection, training, and validation.
+train_loader = trainer.create_dataloader(train_data, train_targets, batch_size=8)
+val_loader = trainer.create_dataloader(val_data, val_targets, batch_size=8, shuffle=False)
 
-## Module Overview
+# Manual training
+config = {
+    "epochs": 100,
+    "patience": 10,
+    "batch_size": 8,
+    "auto_tune": False
+}
+trainer.manual_train(train_loader, val_loader, config)
 
-- `data/`: Handles data ingestion and initial processing.
-- `preprocessing/`: Implements Fourier optics-specific preprocessing techniques.
-- `models/`: Contains model architectures and selection logic.
-- `training/`: Manages the training process, including loss functions and optimization.
-- `utils/`: Includes metrics, visualization tools, and deployment utilities.
+# Save model
+trainer.save_model("best_model.pth")
 
-## Advanced Usage
 
-### Custom Model Integration
+## Configuration
 
-To add a custom model:
+You can use a `config.yaml` file for training parameters:
 
-1. Create a new model class in `models/custom_models.py`.
-2. Add the model to the selection options in `models/architecture.py`.
+yaml
+epochs: 100
+patience: 10
+batch_size: 8
+auto_tune: false
 
-### Hyperparameter Tuning
-
-The framework uses Optuna for hyperparameter optimization. Modify `training/trainer.py` to adjust the hyperparameter search space.
 
 ## Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to submit pull requests, report issues, or request features.
-
-## Citing This Work
-
-If you use this framework in your research, please cite it as follows:
-
-```
-@software{fourier_optics_automl,
-  author = {Arpita Paul},
-  title = {Fourier Optics AutoML Framework},
-  year = {2025},
-  url = {https://github.com/yourusername/fourier-optics-automl}
-}
-```
+Contributions are welcome! Please open issues or submit pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License
 
-## Acknowledgments
+---
 
+Contact:  
+Your Name – paularpita.ap12@gmail.com
 
-
-## Contact
-
-For questions or support, please open an issue on GitHub or contact paularpita.ap12@gmail.com.
