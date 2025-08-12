@@ -1,6 +1,12 @@
 # FOAML: Fourier Optics AutoML Framework
 
+<<<<<<< HEAD
 A modular, production-ready framework for training and optimizing physics-informed neural networks in Fourier optics.
+=======
+## Overview
+
+The Fourier Optics AutoML Framework is a comprehensive, automated system for analyzing and processing optical data using both Fourier optics principles and machine learning techniques. This framework is designed to bridge the gap between traditional optical analysis and modern machine learning approaches, providing a powerful tool for researchers and engineers in the field of optics. It is still under development.
+>>>>>>> cf27216d6a4a7908b9ffba1a1ef99bca08681347
 
 ## Features
 
@@ -64,7 +70,24 @@ auto_tune: false
 
 ## Contributing
 
+<<<<<<< HEAD
 Contributions are welcome! Please open issues or submit pull requests.
+=======
+I welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to submit pull requests, report issues, or request features.
+
+## Citing This Work
+
+If you use this framework in your research, please cite it as follows:
+
+```
+@software{fourier_optics_automl,
+  author = {Arpita Paul},
+  title = {Fourier Optics AutoML Framework},
+  year = {2025},
+  url = {https://github.com/yourusername/fourier-optics-automl}
+}
+```
+>>>>>>> cf27216d6a4a7908b9ffba1a1ef99bca08681347
 
 ## License
 
