@@ -1,6 +1,5 @@
 # OptiqAI
 
-<<<<<<< HEAD
 A modular, production-ready framework for training and optimizing physics-informed neural networks in Fourier optics.
 =======
 ## Overview
