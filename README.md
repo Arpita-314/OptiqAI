@@ -5,7 +5,6 @@ A modular, production-ready framework for training and optimizing physics-inform
 ## Overview
 
 OptiqAI is a comprehensive, automated system for analyzing and processing optical data using both Fourier optics principles and machine learning techniques. This framework is designed to bridge the gap between traditional optical analysis and modern machine learning approaches, providing a powerful tool for researchers and engineers in the field of optics. It is still under development.
->>>>>>> cf27216d6a4a7908b9ffba1a1ef99bca08681347
 
 ## Features
 
