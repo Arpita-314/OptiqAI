@@ -95,4 +95,4 @@ MIT License
 
 Contact:  
 Your Name – paularpita.ap12@gmail.com
-
+# more updates to be followed : a good read - https://magazine.sebastianraschka.com/p/the-big-llm-architecture-comparison
